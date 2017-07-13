@@ -1,0 +1,49 @@
+import React from 'react';
+import {connect} from 'react-redux';
+import api from '../Api'
+import PropTypes from 'prop-types';
+import { setUser } from '../Actions/Auth'
+
+export default function (ComposedComponent) {
+  class Authenticate extends React.Component {
+
+    componentDidMount() {
+      this.checkLogin()
+    }
+
+    checkLogin = () => {
+      api.Auth.me().then(response => {
+        this.props.setUser(response.data)
+      }).catch(e => {
+        this.props.setUser(null);
+        this.context.router.push('/login');
+      })
+    };
+
+    render() {
+      if (!this.props.activeUser) {
+        return false
+      }
+
+      return (
+        <ComposedComponent  {...this.props} />
+      );
+    }
+  }
+
+  Authenticate.contextTypes = {
+    router: PropTypes.object.isRequired
+  };
+
+  Authenticate.propTypes = {
+    setUser: PropTypes.func.isRequired
+  };
+
+  function mapStateToProps(state) {
+    return {
+      activeUser: state.authReducer.activeUser
+    }
+  }
+
+  return connect(mapStateToProps, {setUser})(Authenticate);
+}

@@ -43,3 +43,103 @@ th.sort {
 .DraftEditor-editorContainer {
     min-height:150px;
 }
+.you-will-now-them {
+    background:#fff;
+    padding-bottom:30px;
+    border-bottom: 1px solid #d9d9d9;
+}
+.you-will-now-them .people {
+    margin-left:30px;
+    padding-top:15px;
+    overflow: hidden;
+    margin-top: 20px;
+}
+.people .add button {
+    color:#fff;
+    background:#33b5e5;
+    border: 1px solid #fff;
+    height:28px;
+    width:155px;
+
+    outline:none;
+    border-radius:2px;
+}
+.people .add button:hover{
+    background:#178ab4;
+}
+.people span.add {
+    border: 1px solid #178ab4;
+    padding: 6px 0;
+    border-radius: 3px;
+}
+.people .image {
+    float:left;
+    padding-right:15px;
+    max-width: 100px;
+}
+.people .work-ins {
+    font-family:"Verdana";
+    font-size:12px;
+    color:#868687;
+    margin-bottom: 12px;
+    padding-bottom:2px;
+}
+.people .name a {
+    color: #666;
+    font-family: "Verdana";
+    font-size:12px;
+    font-weight:600;
+}
+.people .name {
+    padding-bottom: 3px;
+}
+.people .name a:hover{
+    text-decoration:none;
+}
+.you-will-now-them-header {
+    margin-top: 25px;
+    background: #f2f2f2;
+    width: 100%;
+    padding: 15px 40px;
+    box-sizing: border-box;
+    color: #33b5e5;
+    font-size: 18px;
+}
+.you-will-now-them-header p {
+    margin-bottom: 0;
+}
+.sendMessageModal .modal-header img.img-responsive {
+    max-width: 50px;
+    margin-right: 10px;
+    float: left;
+}
+.sendMessageModal .modal-content {
+    border-radius: 0;
+}
+.sendMessageModal .modal-body {
+    overflow: hidden;
+}
+.sendMessageModal .modal-content textarea {
+    resize: none;
+    border-radius: 0;
+    margin-bottom: 15px;
+    outline: none;
+    box-shadow: none;
+}
+.sendMessageModal .send-btn {
+    color: #fff;
+    background: #33b5e5;
+    border: 1px solid #f1f1f1;
+    height: 33px;
+    width: 155px;
+    outline: none;
+    border-radius: 2px;
+    float: right;
+}
+.header .navbar-brand {
+    color: #178ab4;
+    font-weight: bold;
+}
+.header .navbar-brand:hover {
+    color: #1c8eb4;
+}

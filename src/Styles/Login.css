@@ -135,3 +135,10 @@ body {
   color: #333333;
   text-decoration: none;
 }
+.form-group input {
+    margin-bottom: 0;
+}
+.form-group .errors .help-block {
+    color:#d9273c;
+}
+

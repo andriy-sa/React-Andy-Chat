@@ -17,7 +17,19 @@ axios.interceptors.request.use(function (config) {
 
 export default {
 	Chat: {
-
+		sendMessage(data){
+			let body = {
+				"room_id": data.room_id || null,
+				"to_id": data.to_id || null,
+				"message": data.message
+			};
+			return axios.post(baseUrl + 'chat/message', body)
+		}
+	},
+	User: {
+		list(){
+			return axios.get(baseUrl + 'user/list')
+		}
 	},
 	Auth: {
 		me(){
@@ -25,6 +37,9 @@ export default {
 		},
 		login(user){
 			return axios.post(baseUrl + 'login', user)
+		},
+		register(user){
+			return axios.post(baseUrl + 'user', user)
 		}
 	}
 }

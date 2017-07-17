@@ -24,6 +24,12 @@ export default {
 				"message": data.message
 			};
 			return axios.post(baseUrl + 'chat/message', body)
+		},
+		getRooms(){
+			return axios.get(baseUrl + 'chat/rooms')
+		},
+		getRoomMessages(id){
+			return axios.get(baseUrl + 'chat/messages/'+id);
 		}
 	},
 	User: {

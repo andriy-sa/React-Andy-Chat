@@ -8,7 +8,7 @@ body {
   max-width: 1170px;
   margin: 0 auto;
   display: flex;
-  height: 100vh;
+  height: calc(100vh - 77px);
 }
 
 .messages__buyers {
@@ -381,4 +381,10 @@ body {
 }
 .chat-container {
     margin-top: 25px;
+}
+.no-read.badge {
+    background: #178ab4;
+    position: absolute;
+    right: 5px;
+    bottom: 5px;
 }

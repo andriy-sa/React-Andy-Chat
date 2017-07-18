@@ -4,11 +4,12 @@ import api from '../Api'
 import PropTypes from 'prop-types';
 import { setUser } from '../Actions/Auth'
 
+
 export default function (ComposedComponent) {
   class Authenticate extends React.Component {
 
     componentDidMount() {
-      this.checkLogin()
+      this.checkLogin();
     }
 
     checkLogin = () => {
@@ -41,7 +42,7 @@ export default function (ComposedComponent) {
 
   function mapStateToProps(state) {
     return {
-      activeUser: state.authReducer.activeUser
+      activeUser: state.authReducer.activeUser,
     }
   }
 

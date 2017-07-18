@@ -1,8 +1,24 @@
 import React from 'react';
 import Header from './Blocks/Header'
 import { connect } from 'react-redux'
+import io from 'socket.io-client'
+import { setSocket } from '../Actions/Auth'
 
 class App extends React.Component {
+
+	componentDidMount(){
+		let token = localStorage.getItem('jwtToken');
+		let socket = io.connect({
+			transportOptions: {
+				polling: {
+					extraHeaders: {
+						'Authorization': 'Bearer '+token
+					}
+				}
+			}
+		});
+		this.props.setSocket(socket);
+	}
 
   render() {
     let path = this.props.location.pathname;
@@ -21,8 +37,9 @@ class App extends React.Component {
 
 function mapStateToProps(state) {
   return {
-    activeUser: state.authReducer.activeUser
+    activeUser: state.authReducer.activeUser,
+		socket: state.authReducer.socket
   }
 }
 
-export default connect(mapStateToProps, {})(App);
+export default connect(mapStateToProps, {setSocket})(App);

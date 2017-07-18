@@ -4,6 +4,8 @@ import Api from './../Api'
 import classNames from 'classnames'
 import {CFG} from './../Config'
 import moment from 'moment'
+import {connect} from 'react-redux'
+import _ from 'underscore'
 
 const messages = document.getElementsByClassName('conv__msgs');
 
@@ -19,59 +21,90 @@ class Messages extends React.Component {
 			rooms: [],
 			activeRoom: {},
 			messages: [],
-			new_message : ''
+			new_message: ''
 		};
 	}
 
 	componentDidMount() {
 		Api.Chat.getRooms().then(response => {
 			if (response.status === 200) {
+				_.each(response.data, (item)=>{
+					if(item.last_message_date){
+						item.last_message_date = new Date(item.last_message_date);
+					}
+				});
 				this.setState({rooms: response.data})
 			}
 		});
+		// socket events
+		let thisClass = this;
+		this.props.socket.on('message', function (data) {
+			if (data.room_id === thisClass.state.activeRoom.id) {
+				thisClass.pushMessage(data);
+				let rooms = thisClass.state.rooms;
+				let roomKey = _.findKey(rooms, {'id':data.room_id});
+				if(roomKey){
+					rooms[roomKey].last_message_date = new Date(data.created_at);
+					rooms = thisClass.sortRoomsByMessage(rooms);
+					thisClass.setState({rooms});
+				}
+			}else{
+				let rooms = thisClass.state.rooms;
+				let roomKey = _.findKey(rooms, {'id':data.room_id});
+				if(roomKey){
+					rooms[roomKey].unread_messages++;
+					rooms[roomKey].last_message_date = new Date(data.created_at);
+					rooms = thisClass.sortRoomsByMessage(rooms);
+					thisClass.setState({rooms});
+				}else{
+					//append room to users list
+ 				}
+			}
+		})
 	}
 
-	parseDate = (last_message, todayW = true) =>{
-		if(!last_message){
+	parseDate = (last_message, todayW = true) => {
+		if (!last_message) {
 			return '';
 		}
 		let today = moment();
-		let date = moment(last_message);
-		if(date.diff(today,'days') === 0){
-			return todayW ? 'today '+date.format('H:mm') : date.format('H:mm')
+		let date  = moment(last_message);
+		if (date.diff(today, 'days') === 0) {
+			return todayW ? 'today ' + date.format('H:mm') : date.format('H:mm')
 		}
-		else if(date.diff(today,'days') === -1){
-			return 'yesterday '+date.format('H:mm')
+		else if (date.diff(today, 'days') === -1) {
+			return 'yesterday ' + date.format('H:mm')
 		}
-		else{
+		else {
 			return date.format('MMMM Do YYYY, H:mm');
 		}
 	};
 
 	selectRoom = (room) => {
-		if(room.id === this.state.activeRoom.id){
+		if (room.id === this.state.activeRoom.id) {
 			return false;
 		}
 		Api.Chat.getRoomMessages(room.id).then(response => {
 			if (response.status === 200) {
-				if(!room.is_group){
+				if (!room.is_group) {
 					response.data.room.username = room.username;
 				}
-				this.setState({activeRoom: response.data.room, messages:response.data.messages.reverse()})
-				scrollToBottom()
+				this.setState({activeRoom: response.data.room, messages: response.data.messages.reverse()});
+				this.props.socket.emit('select_room', {'select': true});
+				scrollToBottom();
+				this.nullableMessagesCounter(room.id);
 			}
 		}, (e) => {
-			this.setState({activeRoom: {}, messages:[]})
+			this.setState({activeRoom: {}, messages: []})
 		});
 	};
 
 	checkFirstMessage = (message, key) => {
-		if(!this.state.messages[key -1]){
+		if (!this.state.messages[key - 1]) {
 			return true;
-		}else
-		if(message.sender_id !== this.state.messages[key -1].sender_id){
+		} else if (message.sender_id !== this.state.messages[key - 1].sender_id) {
 			return true;
-		}else{
+		} else {
 			return false;
 		}
 	};
@@ -82,31 +115,61 @@ class Messages extends React.Component {
 
 	sendMessage = (event) => {
 		event.preventDefault();
-		if(this.state.new_message){
+		if (this.state.new_message) {
 			Api.Chat.sendMessage({
 				"room_id": this.state.activeRoom.id,
-				"message":this.state.new_message
+				"message": this.state.new_message
 			}).then(response => {
 				if (response.status === 200) {
+					this.props.socket.emit('message', response.data);
+					//update my messages history
 					this.setState({new_message: ''});
-					scrollToBottom();
+					this.pushMessage(response.data);
 				}
 			});
 		}
 	};
 
+	pushMessage = (message) => {
+		let messages = this.state.messages;
+		messages.push(message);
+		this.setState({messages});
+		scrollToBottom();
+	};
 
+	nullableMessagesCounter = (room_id) => {
+		let rooms = this.state.rooms;
+		let roomKey = _.findKey(rooms, {'id':room_id});
+		if(roomKey){
+			rooms[roomKey].unread_messages = 0;
+			this.setState({rooms});
+		}
+		let last_message = _.last(this.state.messages);
+		if(last_message){
+			//send api for update last read message in_room
+		}
+	};
+
+	sortRoomsByMessage = (rooms) =>{
+		rooms = _.sortBy(rooms, (item)=>{
+			return item.last_message_date;
+		});
+		return rooms.reverse();
+	};
 
 	render() {
 		return (
 			<div className="container chat-container">
 				<div className="messages__buyers">
-					<input className="msg-buyer msg-buyer__search p-l-50" placeholder="search" />
+					<input className="msg-buyer msg-buyer__search p-l-50" placeholder="search"/>
 					<span className="fa fa-search msg-buyer__sicon" aria-hidden="true"></span>
 					{this.state.rooms.map((v, i) => {
 						return (
-							<div onClick={this.selectRoom.bind(this, v)} key={i}  className={classNames({'active': this.state.activeRoom.id === v.id, 'msg-buyer':true})}>
-								<img className="msg-buyer__logo" src={ CFG.staticUrl+ '/' +( v.is_group ? 'default_group.png' : (v.avatar ? v.avatar : 'default.jpg') ) } alt="logo"/>
+							<div onClick={this.selectRoom.bind(this, v)} key={i}
+									 className={classNames({'active': this.state.activeRoom.id === v.id, 'msg-buyer': true})}>
+								<img className="msg-buyer__logo"
+										 src={ CFG.staticUrl + '/' + ( v.is_group ? 'default_group.png' : (v.avatar ? v.avatar : 'default.jpg') ) }
+										 alt="logo"/>
 								<span className="msg-buyer__name">{ ( v.is_group ? v.name : v.username ) }</span>
 								{/*<span className="msg-buyer__text">Raw denim you probably haven’t...</span>*/}
 								<span className="msg-buyer__time">{ this.parseDate(v.last_message_date) }</span>
@@ -128,25 +191,26 @@ class Messages extends React.Component {
 					<main className="conv__msgs">
 
 						{this.state.messages.map((v, i) => {
-							if(v.sender_id === this.props.activeUser.id){
+							if (v.sender_id === this.props.activeUser.id) {
 								return (
-									<div key={i} className={classNames({'msg-first': this.checkFirstMessage(v,i), 'msg msg__my':true})}>
+									<div key={i} className={classNames({'msg-first': this.checkFirstMessage(v, i), 'msg msg__my': true})}>
 										{ v.message}
-										<p className="msg-time">{ this.parseDate(v.created_at,false) }</p>
+										<p className="msg-time">{ this.parseDate(v.created_at, false) }</p>
 									</div>
 								)
-							}else{
+							} else {
 								return (
 									<div key={i}>
 										{
-											this.checkFirstMessage(v,i) &&
-											<img className="msg_img" src={ CFG.staticUrl+ '/' + (v.avatar ? v.avatar : 'default.jpg') } alt="logo"/>
+											this.checkFirstMessage(v, i) &&
+											<img className="msg_img" src={ CFG.staticUrl + '/' + (v.avatar ? v.avatar : 'default.jpg') }
+													 alt="logo"/>
 										}
 
 										<div className="msg-user-block">
-											<div className={classNames({'msg-first': this.checkFirstMessage(v,i), 'msg msg__user':true})}>
+											<div className={classNames({'msg-first': this.checkFirstMessage(v, i), 'msg msg__user': true})}>
 												{ v.message}
-												<p className="msg-time">{ this.parseDate(v.created_at,false) }</p>
+												<p className="msg-time">{ this.parseDate(v.created_at, false) }</p>
 											</div>
 										</div>
 									</div>
@@ -156,29 +220,34 @@ class Messages extends React.Component {
 					</main>
 					{ !!this.state.activeRoom.id &&
 
-						<form className="conv__input" onSubmit={this.sendMessage}>
-							<input
-								type="text"
-								name="new_message"
-								value={this.state.new_message}
-								onChange={this.changeMessage}
-								className="section__input newmsg-input"
-								placeholder="typeMessage"
-							/>
+					<form className="conv__input" onSubmit={this.sendMessage}>
+						<input
+							type="text"
+							name="new_message"
+							value={this.state.new_message}
+							onChange={this.changeMessage}
+							className="section__input newmsg-input"
+							placeholder="typeMessage"
+						/>
 
-							<button
-								type="submit"
-								name="button"
-								className="newmsg-btn"
-							>
-								<img src="send.svg" alt="send"/>
-							</button>
-						</form>
+						<button
+							type="submit"
+							name="button"
+							className="newmsg-btn"
+						>
+							<img src="send.svg" alt="send"/>
+						</button>
+					</form>
 					}
 				</div>
 			</div>
 		);
 	}
 }
+function mapStateToProps(state) {
+	return {
+		socket: state.authReducer.socket
+	}
+}
 
-export default Messages
+export default connect(mapStateToProps, {})(Messages)

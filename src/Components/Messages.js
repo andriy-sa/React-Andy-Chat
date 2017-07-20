@@ -21,23 +21,18 @@ class Messages extends React.Component {
 			rooms: [],
 			activeRoom: {},
 			messages: [],
-			new_message: ''
+			new_message: '',
+			usersTyping: []
 		};
+
+		this.throttleUserTyping = _.throttle(this.waitUserTyping, 3000)
 	}
 
 	componentDidMount() {
-		Api.Chat.getRooms().then(response => {
-			if (response.status === 200) {
-				_.each(response.data, (item)=>{
-					if(item.last_message_date){
-						item.last_message_date = new Date(item.last_message_date);
-					}
-				});
-				this.setState({rooms: response.data})
-			}
-		});
+		this.loadUserRooms();
 		// socket events
 		let thisClass = this;
+
 		this.props.socket.on('message', function (data) {
 			if (data.room_id === thisClass.state.activeRoom.id) {
 				thisClass.pushMessage(data);
@@ -47,6 +42,7 @@ class Messages extends React.Component {
 					rooms[roomKey].last_message_date = new Date(data.created_at);
 					rooms = thisClass.sortRoomsByMessage(rooms);
 					thisClass.setState({rooms});
+					thisClass.nullableMessagesCounter(rooms[roomKey].id, true);
 				}
 			}else{
 				let rooms = thisClass.state.rooms;
@@ -58,10 +54,41 @@ class Messages extends React.Component {
 					thisClass.setState({rooms});
 				}else{
 					//append room to users list
+					thisClass.loadUserRooms();
  				}
+			}
+		});
+
+		this.props.socket.on('user_typing', function (date) {
+			if(thisClass.state.activeRoom.id === date['room_id']){
+				let usersTyping = thisClass.state.usersTyping;
+				usersTyping.push(date['username']);
+				thisClass.setState({usersTyping});
+				setTimeout(()=> {
+					thisClass.setState({usersTyping : []});
+				}, 2500)
 			}
 		})
 	}
+	waitUserTyping = () => {
+		this.props.socket.emit('user_typing',{
+			'room_id':this.state.activeRoom.id,
+			'username': this.props.activeUser.first_name + ' ' +  this.props.activeUser.last_name
+		});
+	};
+
+	loadUserRooms = () =>{
+		Api.Chat.getRooms().then(response => {
+			if (response.status === 200) {
+				_.each(response.data, (item)=>{
+					if(item.last_message_date){
+						item.last_message_date = new Date(item.last_message_date);
+					}
+				});
+				this.setState({rooms: response.data})
+			}
+		});
+	};
 
 	parseDate = (last_message, todayW = true) => {
 		if (!last_message) {
@@ -89,7 +116,7 @@ class Messages extends React.Component {
 				if (!room.is_group) {
 					response.data.room.username = room.username;
 				}
-				this.setState({activeRoom: response.data.room, messages: response.data.messages.reverse()});
+				this.setState({activeRoom: response.data.room, messages: response.data.messages.reverse(), usersTyping: []});
 				this.props.socket.emit('select_room', {'select': true});
 				scrollToBottom();
 				this.nullableMessagesCounter(room.id);
@@ -110,6 +137,7 @@ class Messages extends React.Component {
 	};
 
 	changeMessage = (event) => {
+		this.throttleUserTyping();
 		this.setState({new_message: event.target.value});
 	};
 
@@ -137,17 +165,18 @@ class Messages extends React.Component {
 		scrollToBottom();
 	};
 
-	nullableMessagesCounter = (room_id) => {
+	nullableMessagesCounter = (room_id, fromSocket = false) => {
 		let rooms = this.state.rooms;
 		let roomKey = _.findKey(rooms, {'id':room_id});
 		if(roomKey){
+			let last_message = _.last(this.state.messages);
+			if(last_message && (rooms[roomKey].unread_messages !== 0 || fromSocket)){
+				Api.Chat.updateCounter(rooms[roomKey].id, last_message.id).then(response => {});
+			}
 			rooms[roomKey].unread_messages = 0;
 			this.setState({rooms});
 		}
-		let last_message = _.last(this.state.messages);
-		if(last_message){
-			//send api for update last read message in_room
-		}
+
 	};
 
 	sortRoomsByMessage = (rooms) =>{
@@ -155,6 +184,14 @@ class Messages extends React.Component {
 			return item.last_message_date;
 		});
 		return rooms.reverse();
+	};
+
+	getTypingMessage = () => {
+		let users = this.state.usersTyping;
+		if (users.length){
+			return users.join(',')+ ' typing...'
+		}
+		return ''
 	};
 
 	render() {
@@ -167,9 +204,14 @@ class Messages extends React.Component {
 						return (
 							<div onClick={this.selectRoom.bind(this, v)} key={i}
 									 className={classNames({'active': this.state.activeRoom.id === v.id, 'msg-buyer': true})}>
-								<img className="msg-buyer__logo"
-										 src={ CFG.staticUrl + '/' + ( v.is_group ? 'default_group.png' : (v.avatar ? v.avatar : 'default.jpg') ) }
-										 alt="logo"/>
+								<div className="msg-buyer__logo">
+									<img className="img-responsive"
+											 src={ CFG.staticUrl + '/' + ( v.is_group ? 'default_group.png' : (v.avatar ? v.avatar : 'default.jpg') ) }
+											 alt="logo"/>
+									{
+										v.online && <span className="label label-success online"></span>
+									}
+								</div>
 								<span className="msg-buyer__name">{ ( v.is_group ? v.name : v.username ) }</span>
 								{/*<span className="msg-buyer__text">Raw denim you probably haven’t...</span>*/}
 								<span className="msg-buyer__time">{ this.parseDate(v.last_message_date) }</span>
@@ -237,6 +279,9 @@ class Messages extends React.Component {
 						>
 							<img src="send.svg" alt="send"/>
 						</button>
+						<div className="userTyping">
+							{ this.getTypingMessage() }
+						</div>
 					</form>
 					}
 				</div>

@@ -76,6 +76,7 @@ th.sort {
     float:left;
     padding-right:15px;
     max-width: 100px;
+    position: relative;
 }
 .people .work-ins {
     font-family:"Verdana";
@@ -143,3 +144,16 @@ th.sort {
 .header .navbar-brand:hover {
     color: #1c8eb4;
 }
+.label.online {
+    border: 1px solid #ca1e1e;
+    position: absolute;
+    right: 15px;
+    bottom: 0px;
+    height: 12px;
+    display: block;
+}
+.image img {
+    border: 1px solid #f2f2f2;
+    border-radius: 4px;
+}
+

@@ -3,7 +3,7 @@ import {Modal} from 'react-bootstrap'
 import {CFG} from './../../Config'
 import Api from './../../Api'
 
-const MessageModal = ({user, show, forClose, forNotification, message}) => {
+const MessageModal = ({user, show, forClose, forNotification, message, socket}) => {
 
 	const sendMesage = () => {
 			if(message){
@@ -12,6 +12,7 @@ const MessageModal = ({user, show, forClose, forNotification, message}) => {
 					message: message
 				}).then( response => {
 					forClose();
+					socket.emit('message', response.data);
 					message = '';
 					forNotification();
 				});
@@ -29,7 +30,7 @@ const MessageModal = ({user, show, forClose, forNotification, message}) => {
 					<img className="img-responsive" alt="people"
 							 src={CFG.staticUrl + '/'+( user.avatar ? user.avatar : 'default.jpg' )}/>
 					<Modal.Title>{ user.first_name + ' ' + user.last_name }</Modal.Title>
-					<span>Offline</span>
+					<span>{ (user.online ? 'online' : 'offline') }</span>
 				</Modal.Header>
 				<Modal.Body>
 					<div className="form-group">

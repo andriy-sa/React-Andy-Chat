@@ -30,6 +30,9 @@ export default {
 		},
 		getRoomMessages(id){
 			return axios.get(baseUrl + 'chat/messages/'+id);
+		},
+		updateCounter(room_id, message_id){
+			return axios.post(baseUrl+'chat/update_counter/'+room_id, {'message_id':message_id});
 		}
 	},
 	User: {

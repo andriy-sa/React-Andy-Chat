@@ -399,4 +399,32 @@ border-radius: 4px;
     display: block;
     font-size: 12px;
 }
-
+#menuDropdown {
+    background: transparent;
+    border: 0;
+    display: block;
+    position: absolute;
+    right: 0;
+    top: 0;
+}
+.dropdown-zone {
+    height: 56px;
+}
+.dropdown-zone .dropdown.btn-group {
+    height: 30px;
+    width: 100%;
+    text-align: right;
+}
+.dropdown-zone ul.dropdown-menu {
+    float: right;
+    left: initial;
+    right: 0;
+}
+.createRoomModal .modal-body {
+    min-height: 300px;
+}
+.dropdown-zone.message-dropdown-zone{
+    position: absolute;
+    top: -15px;
+    right: 0;
+}

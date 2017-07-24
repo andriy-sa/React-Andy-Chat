@@ -33,6 +33,13 @@ export default {
 		},
 		updateCounter(room_id, message_id){
 			return axios.post(baseUrl+'chat/update_counter/'+room_id, {'message_id':message_id});
+		},
+		privateRoom(users, name, room_id = null){
+			return axios.post(baseUrl+'chat/room',{
+				'users': users,
+				'name': name,
+				room_id: room_id
+			});
 		}
 	},
 	User: {

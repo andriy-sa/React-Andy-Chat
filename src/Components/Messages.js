@@ -6,6 +6,9 @@ import {CFG} from './../Config'
 import moment from 'moment'
 import {connect} from 'react-redux'
 import _ from 'underscore'
+import {MenuItem, Glyphicon, Dropdown} from 'react-bootstrap'
+import CreateRoomModal from './Blocks/CreateRoomModal'
+import NotificationSystem from 'react-notification-system'
 
 const messages = document.getElementsByClassName('conv__msgs');
 
@@ -22,66 +25,101 @@ class Messages extends React.Component {
 			activeRoom: {},
 			messages: [],
 			new_message: '',
-			usersTyping: []
+			usersTyping: [],
+			showModal: false,
+			users: [],
+			selectedUsers: [],
+			newRoomName: ''
 		};
 
 		this.throttleUserTyping = _.throttle(this.waitUserTyping, 3000)
 	}
+
+	_notificationSystem = null;
 
 	componentDidMount() {
 		this.loadUserRooms();
 		// socket events
 		let thisClass = this;
 
+		this._notificationSystem = this.refs.notificationSystem;
+
 		this.props.socket.on('message', function (data) {
 			if (data.room_id === thisClass.state.activeRoom.id) {
 				thisClass.pushMessage(data);
-				let rooms = thisClass.state.rooms;
-				let roomKey = _.findKey(rooms, {'id':data.room_id});
-				if(roomKey){
+				let rooms   = thisClass.state.rooms;
+				let roomKey = _.findKey(rooms, {'id': data.room_id});
+				if (roomKey) {
 					rooms[roomKey].last_message_date = new Date(data.created_at);
-					rooms = thisClass.sortRoomsByMessage(rooms);
+					rooms                            = thisClass.sortRoomsByMessage(rooms);
 					thisClass.setState({rooms});
 					thisClass.nullableMessagesCounter(rooms[roomKey].id, true);
 				}
-			}else{
-				let rooms = thisClass.state.rooms;
-				let roomKey = _.findKey(rooms, {'id':data.room_id});
-				if(roomKey){
+			} else {
+				let rooms   = thisClass.state.rooms;
+				let roomKey = _.findKey(rooms, {'id': data.room_id});
+				if (roomKey) {
 					rooms[roomKey].unread_messages++;
 					rooms[roomKey].last_message_date = new Date(data.created_at);
-					rooms = thisClass.sortRoomsByMessage(rooms);
+					rooms                            = thisClass.sortRoomsByMessage(rooms);
 					thisClass.setState({rooms});
-				}else{
+				} else {
 					//append room to users list
 					thisClass.loadUserRooms();
- 				}
+				}
 			}
 		});
 
 		this.props.socket.on('user_typing', function (date) {
-			if(thisClass.state.activeRoom.id === date['room_id']){
+			if (thisClass.state.activeRoom.id === date['room_id']) {
 				let usersTyping = thisClass.state.usersTyping;
 				usersTyping.push(date['username']);
 				thisClass.setState({usersTyping});
-				setTimeout(()=> {
-					thisClass.setState({usersTyping : []});
+				setTimeout(() => {
+					thisClass.setState({usersTyping: []});
 				}, 2500)
 			}
-		})
+		});
+
+		this.props.socket.on('user_connect', function (data) {
+			let rooms   = thisClass.state.rooms;
+			let roomKey = _.findKey(rooms, {'friend_id': data.id});
+			if (roomKey) {
+				rooms[roomKey].online = true;
+				thisClass.setState({rooms})
+			}
+		});
+
+		this.props.socket.on('user_disconnect', function (data) {
+			let rooms   = thisClass.state.rooms;
+			let roomKey = _.findKey(rooms, {'friend_id': data.id});
+			if (roomKey) {
+				rooms[roomKey].online = false;
+				thisClass.setState({rooms})
+			}
+		});
 	}
-	waitUserTyping = () => {
-		this.props.socket.emit('user_typing',{
-			'room_id':this.state.activeRoom.id,
-			'username': this.props.activeUser.first_name + ' ' +  this.props.activeUser.last_name
+
+	addNotification = (message, level) => {
+		this._notificationSystem.addNotification({
+			message: message,
+			level: level,
+			position: 'br'
 		});
 	};
 
-	loadUserRooms = () =>{
+	waitUserTyping = () => {
+		this.props.socket.emit('user_typing', {
+			'room_id': this.state.activeRoom.id,
+			'username': this.props.activeUser.first_name + ' ' + this.props.activeUser.last_name
+		});
+	};
+
+	loadUserRooms = () => {
 		Api.Chat.getRooms().then(response => {
 			if (response.status === 200) {
-				_.each(response.data, (item)=>{
-					if(item.last_message_date){
+				_.each(response.data, (item) => {
+					if (item.last_message_date) {
 						item.last_message_date = new Date(item.last_message_date);
 					}
 				});
@@ -166,12 +204,13 @@ class Messages extends React.Component {
 	};
 
 	nullableMessagesCounter = (room_id, fromSocket = false) => {
-		let rooms = this.state.rooms;
-		let roomKey = _.findKey(rooms, {'id':room_id});
-		if(roomKey){
+		let rooms   = this.state.rooms;
+		let roomKey = _.findKey(rooms, {'id': room_id});
+		if (roomKey) {
 			let last_message = _.last(this.state.messages);
-			if(last_message && (rooms[roomKey].unread_messages !== 0 || fromSocket)){
-				Api.Chat.updateCounter(rooms[roomKey].id, last_message.id).then(response => {});
+			if (last_message && (rooms[roomKey].unread_messages !== 0 || fromSocket)) {
+				Api.Chat.updateCounter(rooms[roomKey].id, last_message.id).then(response => {
+				});
 			}
 			rooms[roomKey].unread_messages = 0;
 			this.setState({rooms});
@@ -179,8 +218,8 @@ class Messages extends React.Component {
 
 	};
 
-	sortRoomsByMessage = (rooms) =>{
-		rooms = _.sortBy(rooms, (item)=>{
+	sortRoomsByMessage = (rooms) => {
+		rooms = _.sortBy(rooms, (item) => {
 			return item.last_message_date;
 		});
 		return rooms.reverse();
@@ -188,18 +227,37 @@ class Messages extends React.Component {
 
 	getTypingMessage = () => {
 		let users = this.state.usersTyping;
-		if (users.length){
-			return users.join(',')+ ' typing...'
+		if (users.length) {
+			return users.join(',') + ' typing...'
 		}
 		return ''
+	};
+
+	closeModal = () => {
+		this.setState({showModal: false});
+	};
+
+	openModal = () => {
+		Api.User.list().then(response => {
+			this.setState({showModal: true, users: response.data, selectedUsers: []});
+		});
+
 	};
 
 	render() {
 		return (
 			<div className="container chat-container">
 				<div className="messages__buyers">
-					<input className="msg-buyer msg-buyer__search p-l-50" placeholder="search"/>
-					<span className="fa fa-search msg-buyer__sicon" aria-hidden="true"></span>
+					<div className="dropdown-zone">
+						<Dropdown id="menuDropdown">
+							<Dropdown.Toggle>
+								<Glyphicon glyph="cog"/>
+							</Dropdown.Toggle>
+							<Dropdown.Menu className="super-colors">
+								<MenuItem onClick={this.openModal} eventKey="1">Creare Private Room</MenuItem>
+							</Dropdown.Menu>
+						</Dropdown>
+					</div>
 					{this.state.rooms.map((v, i) => {
 						return (
 							<div onClick={this.selectRoom.bind(this, v)} key={i}
@@ -228,6 +286,21 @@ class Messages extends React.Component {
 				<div className="messages__window">
 					<header className="conv__header">
 						<span>{(this.state.activeRoom.is_group ? this.state.activeRoom.name : this.state.activeRoom.username)}</span>
+						{!!(this.state.activeRoom && this.state.activeRoom.is_group) &&
+						<div className="dropdown-zone message-dropdown-zone">
+							<Dropdown id="menuDropdown">
+								<Dropdown.Toggle>
+									<Glyphicon glyph="cog"/>
+								</Dropdown.Toggle>
+								<Dropdown.Menu className="super-colors">
+									{ (this.state.activeRoom.user_id === this.props.activeUser.id) &&
+										<MenuItem eventKey="1">Manage Users</MenuItem>
+									}
+									<MenuItem eventKey="2">Leave Room</MenuItem>
+								</Dropdown.Menu>
+							</Dropdown>
+						</div>
+						}
 					</header>
 
 					<main className="conv__msgs">
@@ -285,6 +358,14 @@ class Messages extends React.Component {
 					</form>
 					}
 				</div>
+				<CreateRoomModal
+					users={this.state.users}
+					newRoomName={this.state.newRoomName}
+					selectedUsers={this.state.selectedUsers}
+					thisClass={this}
+					forClose={this.closeModal.bind(this)}
+					show={this.state.showModal}/>
+				<NotificationSystem ref="notificationSystem"/>
 			</div>
 		);
 	}

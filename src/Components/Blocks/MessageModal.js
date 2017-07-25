@@ -34,7 +34,7 @@ const MessageModal = ({user, show, forClose, forNotification, message, socket}) 
 				</Modal.Header>
 				<Modal.Body>
 					<div className="form-group">
-						<textarea value={message} onChange={updateMessage} name="message" className="form-control" rows="10"></textarea>
+						<textarea maxLength={1000} value={message} onChange={updateMessage} name="message" className="form-control" rows="10"></textarea>
 						<button onClick={sendMesage} className="btn send-btn">Send</button>
 					</div>
 				</Modal.Body>

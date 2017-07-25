@@ -27,7 +27,7 @@ class SignUp extends React.Component {
 					errors: []
 				});
 				localStorage.setItem('jwtToken', response.data.access_token);
-				this.context.router.push('/');
+				this.context.router.push('/users');
 
 			}, (e) => {
 				if (e.response && e.response.data && e.response.data) {

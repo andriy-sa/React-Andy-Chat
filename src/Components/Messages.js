@@ -6,14 +6,17 @@ import {CFG} from './../Config'
 import moment from 'moment'
 import {connect} from 'react-redux'
 import _ from 'underscore'
-import {MenuItem, Glyphicon, Dropdown} from 'react-bootstrap'
+import {MenuItem, Glyphicon, Dropdown, OverlayTrigger, Tooltip} from 'react-bootstrap'
 import CreateRoomModal from './Blocks/CreateRoomModal'
 import NotificationSystem from 'react-notification-system'
+import Linkify from "react-linkify"
 
 const messages = document.getElementsByClassName('conv__msgs');
 
 function scrollToBottom() {
-	messages[0].scrollTop = messages[0].scrollHeight;
+	if(messages && messages[0]){
+		messages[0].scrollTop = messages[0].scrollHeight;
+	}
 }
 
 class Messages extends React.Component {
@@ -29,7 +32,8 @@ class Messages extends React.Component {
 			showModal: false,
 			users: [],
 			selectedUsers: [],
-			newRoomName: ''
+			newRoomName: '',
+			updateRoomMembers: false
 		};
 
 		this.throttleUserTyping = _.throttle(this.waitUserTyping, 3000)
@@ -149,12 +153,23 @@ class Messages extends React.Component {
 		if (room.id === this.state.activeRoom.id) {
 			return false;
 		}
+		this.setState({activeRoom: room});
 		Api.Chat.getRoomMessages(room.id).then(response => {
 			if (response.status === 200) {
 				if (!room.is_group) {
 					response.data.room.username = room.username;
 				}
-				this.setState({activeRoom: response.data.room, messages: response.data.messages.reverse(), usersTyping: []});
+				let resRoom = response.data.room;
+
+				if(resRoom.is_group){
+					let users = [];
+					_.each(resRoom.members, function (item) {
+						users.push(item.user.first_name+' '+item.user.last_name);
+					});
+					resRoom.room_members = users.join(', ');
+				}
+
+				this.setState({activeRoom: resRoom, messages: response.data.messages.reverse(), usersTyping: []});
 				this.props.socket.emit('select_room', {'select': true});
 				scrollToBottom();
 				this.nullableMessagesCounter(room.id);
@@ -237,11 +252,33 @@ class Messages extends React.Component {
 		this.setState({showModal: false});
 	};
 
-	openModal = () => {
+	openModal = (forUpdate = false) => {
+		this.setState({updateRoomMembers: forUpdate});
+		console.log(forUpdate);
 		Api.User.list().then(response => {
-			this.setState({showModal: true, users: response.data, selectedUsers: []});
+			let selectedUsers = forUpdate ? _.map(this.state.activeRoom.members, (item)=> {return {
+				id:item.user.id,
+				username:item.user.username
+			}}) : [];
+			let my_id = this.props.activeUser.id
+			selectedUsers =  _.filter(selectedUsers, function (item) {
+				if(item.id !== my_id){
+					return item;
+				}
+			});
+			this.setState({showModal: true, users: response.data, selectedUsers: _.compact(selectedUsers)});
 		});
 
+	};
+
+	subString = (str, limit) => {
+		if(!str){
+			return '';
+		}
+		if(str.length > limit) {
+			str = str.substring(0,limit) + '...';
+		}
+		return str;
 	};
 
 	render() {
@@ -254,7 +291,7 @@ class Messages extends React.Component {
 								<Glyphicon glyph="cog"/>
 							</Dropdown.Toggle>
 							<Dropdown.Menu className="super-colors">
-								<MenuItem onClick={this.openModal} eventKey="1">Creare Private Room</MenuItem>
+								<MenuItem onClick={this.openModal.bind(this, false)} eventKey="1">Creare Private Room</MenuItem>
 							</Dropdown.Menu>
 						</Dropdown>
 					</div>
@@ -286,6 +323,10 @@ class Messages extends React.Component {
 				<div className="messages__window">
 					<header className="conv__header">
 						<span>{(this.state.activeRoom.is_group ? this.state.activeRoom.name : this.state.activeRoom.username)}</span>
+						{ !!this.state.activeRoom.is_group &&
+						<i className="fz11"> ({ this.subString(this.state.activeRoom.room_members, 100) })</i>
+						}
+
 						{!!(this.state.activeRoom && this.state.activeRoom.is_group) &&
 						<div className="dropdown-zone message-dropdown-zone">
 							<Dropdown id="menuDropdown">
@@ -294,7 +335,7 @@ class Messages extends React.Component {
 								</Dropdown.Toggle>
 								<Dropdown.Menu className="super-colors">
 									{ (this.state.activeRoom.user_id === this.props.activeUser.id) &&
-										<MenuItem eventKey="1">Manage Users</MenuItem>
+										<MenuItem onClick={this.openModal.bind(this, true)} eventKey="1">Manage Users</MenuItem>
 									}
 									<MenuItem eventKey="2">Leave Room</MenuItem>
 								</Dropdown.Menu>
@@ -309,22 +350,28 @@ class Messages extends React.Component {
 							if (v.sender_id === this.props.activeUser.id) {
 								return (
 									<div key={i} className={classNames({'msg-first': this.checkFirstMessage(v, i), 'msg msg__my': true})}>
-										{ v.message}
+										<Linkify>{ v.message}</Linkify>
 										<p className="msg-time">{ this.parseDate(v.created_at, false) }</p>
 									</div>
 								)
 							} else {
+								const tooltip = (
+									<Tooltip id="tooltip"><strong>{ v.first_name + ' ' + v.last_name }</strong></Tooltip>
+								);
 								return (
 									<div key={i}>
 										{
 											this.checkFirstMessage(v, i) &&
-											<img className="msg_img" src={ CFG.staticUrl + '/' + (v.avatar ? v.avatar : 'default.jpg') }
-													 alt="logo"/>
+											<OverlayTrigger placement="top" overlay={tooltip}>
+												<img className="msg_img" src={ CFG.staticUrl + '/' + (v.avatar ? v.avatar : 'default.jpg') }
+														 alt="logo"/>
+											</OverlayTrigger>
+
 										}
 
 										<div className="msg-user-block">
 											<div className={classNames({'msg-first': this.checkFirstMessage(v, i), 'msg msg__user': true})}>
-												{ v.message}
+												<Linkify>{ v.message}</Linkify>
 												<p className="msg-time">{ this.parseDate(v.created_at, false) }</p>
 											</div>
 										</div>
@@ -338,6 +385,7 @@ class Messages extends React.Component {
 					<form className="conv__input" onSubmit={this.sendMessage}>
 						<input
 							type="text"
+							maxLength={1000}
 							name="new_message"
 							value={this.state.new_message}
 							onChange={this.changeMessage}
@@ -361,6 +409,7 @@ class Messages extends React.Component {
 				<CreateRoomModal
 					users={this.state.users}
 					newRoomName={this.state.newRoomName}
+					updateRoomMembers={this.state.updateRoomMembers}
 					selectedUsers={this.state.selectedUsers}
 					thisClass={this}
 					forClose={this.closeModal.bind(this)}

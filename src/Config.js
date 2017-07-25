@@ -1,3 +1,4 @@
 export const CFG = {
-	'staticUrl':  '/b/static/images'
+	'staticUrl':  '/static/images'
+	//'staticUrl':  '/b/static/images'
 };

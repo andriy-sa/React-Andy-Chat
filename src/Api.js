@@ -41,7 +41,10 @@ export default {
 				room_id: room_id,
 				detach: detach
 			});
-		}
+		},
+    leaveRoom(id){
+      return axios.post(baseUrl+'chat/room/leave/'+id,{});
+    }
 	},
 	User: {
 		list(){
